@@ -19,21 +19,18 @@ class Circle::Friendship < ActiveRecord::Base
   FRIENDSHIP_DENIED = "denied"
   FRIENDSHIP_BLOCKED = "blocked"
 
-  attr_accessible :friend_id, :status, :requested_at, :accepted_at, :denied_at, :blocked_at
-
-  scope :pending, where(status: FRIENDSHIP_PENDING)
-  scope :accepted, where(status: FRIENDSHIP_ACCEPTED)
-  scope :requested, where(status: FRIENDSHIP_REQUESTED)
-  scope :denied, where(status: FRIENDSHIP_DENIED)
-  scope :blocked, where(status: FRIENDSHIP_BLOCKED)
+  scope :pending, -> { where(status: FRIENDSHIP_PENDING) }
+  scope :accepted, -> { where(status: FRIENDSHIP_ACCEPTED) }
+  scope :requested, -> { where(status: FRIENDSHIP_REQUESTED) }
+  scope :denied, -> { where(status: FRIENDSHIP_DENIED) }
+  scope :blocked, -> { where(status: FRIENDSHIP_BLOCKED) }
 
   belongs_to :user
   belongs_to :friend, class_name: 'User', foreign_key: 'friend_id'
-
+  
   after_destroy do |f|
     User.decrement_counter(:friends_count, f.user_id) if f.status == FRIENDSHIP_ACCEPTED
   end
-
 
   def pending?
     status == FRIENDSHIP_PENDING

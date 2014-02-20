@@ -24,7 +24,7 @@ class CreateCircleTables < ActiveRecord::Migration
     end
 
     change_table :users do |t|
-      t.integer :friends_cout, :default => 0, :null => false
+      t.integer :friends_count, :default => 0, :null => false
     end
   end
 
