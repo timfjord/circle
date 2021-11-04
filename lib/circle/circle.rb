@@ -16,12 +16,12 @@ module Circle
       has_many :friendship_requests, -> { where "friendships.status = 'requested'" }, class_name: "Circle::Friendship", foreign_key: :friend_id
       has_many :users_blocked, class_name: "Circle::BlockedUser"
       has_many :blocked_users, through: :users_blocked, source: :blocked_user
+
       after_destroy :destroy_all_friendships
     end
   end
 
   module InstanceMethods
-
     def befriend(friend)
       return nil, Circle::Friendship::STATUS_FRIEND_IS_REQUIRED unless friend
       return nil, Circle::Friendship::STATUS_FRIEND_IS_YOURSELF if self.id == friend.id
@@ -64,15 +64,16 @@ module Circle
 
     def friends?(friend)
       friendship = friendship_with(friend)
-      !!(friendship && friendship.accepted?)
+
+      friendship.present? && friendship.accepted?
     end
 
     def blocked?(friend)
-      !!users_blocked.where(blocked_user_id: friend).first
+      users_blocked.where(blocked_user_id: friend).exists?
     end
 
     def unfriend(friend)
-     ActiveRecord::Base.transaction do
+      ActiveRecord::Base.transaction do
         [friendship_with(friend), friend.friendship_with(self)].compact.each do |friendship|
           friendship.destroy if friendship
         end
@@ -81,6 +82,7 @@ module Circle
 
     def accept_friend_request(friend)
       return nil, Circle::Friendship::STATUS_CANNOT_ACCEPT unless can_accept_friend_request? rescue nil
+
       friendship = self.friendship_with(friend)
       if friendship.try(:pending?)
         requested = friend.friendship_with(self)
@@ -105,6 +107,7 @@ module Circle
           end
         end
         request.reload
+
         return request, Circle::Friendship::STATUS_FRIENDSHIP_DENIED
       else
         return nil, Circle::Friendship::STATUS_NOT_FOUND
@@ -115,10 +118,11 @@ module Circle
       request = friendship_with(friend)
       if request
         ActiveRecord::Base.transaction do
-            request.block!(true)
-            friend.friendship_with(self).try(:block!)
+          request.block!(true)
+          friend.friendship_with(self).try(:block!)
         end
         request.reload
+
         return request, Circle::Friendship::STATUS_BLOCKED
       else
         return nil, Circle::Friendship::STATUS_NOT_FOUND
@@ -132,6 +136,7 @@ module Circle
         ActiveRecord::Base.transaction do
           blocked_user.destroy
         end
+
         return nil, Circle::Friendship::STATUS_UNBLOCKED
       else
         return nil, Circle::Friendship::STATUS_NOT_FOUND
@@ -139,11 +144,12 @@ module Circle
     end
 
     private
-      def destroy_all_friendships
-        ActiveRecord::Base.transaction do
-          Circle::Friendship.destroy_all({user_id: id})
-          Circle::Friendship.destroy_all({friend_id: id})
-        end
+
+    def destroy_all_friendships
+      ActiveRecord::Base.transaction do
+        Circle::Friendship.destroy_by(user_id: id)
+        Circle::Friendship.destroy_by(friend_id: id)
       end
+    end
   end
 end
